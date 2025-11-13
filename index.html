@@ -95,12 +95,52 @@
       a {
         color: var(--link);
       }
+
+      /* Responsive adjustments */
+      @media (max-width: 768px) {
+        body {
+          padding: 16px;
+        }
+        h1 {
+          font-size: 1.4rem;
+        }
+        .buttons {
+          grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+          gap: 10px;
+        }
+        video {
+          max-height: 35vh; /* more adaptive on tablets/phones */
+        }
+        .section {
+          margin-bottom: 20px;
+        }
+        .output {
+          font-size: 0.95rem;
+        }
+        button {
+          min-height: 44px; /* accessible touch target */
+        }
+      }
+
+      @media (max-width: 480px) {
+        h1 {
+          font-size: 1.2rem;
+        }
+        .buttons {
+          grid-template-columns: 1fr; /* stack buttons on narrow phones */
+          gap: 8px;
+        }
+        video {
+          max-height: 40vh; /* use viewport height for small screens */
+        }
+        .output {
+          min-height: 60px;
+        }
+      }
     </style>
   </head>
   <body>
     <div class="container">
-      <h1>Native Web APIs Demo (Camera, Location, Clipboard, Notifications, File Picker)</h1>
-
       <div class="buttons">
         <button id="btnCamera">Start Camera</button>
         <button id="btnLocation">Get User Location</button>
@@ -250,7 +290,6 @@
             size: file.size,
             mimeType: file.type || 'application/octet-stream',
             lastModified: file.lastModified || null,
-            // For demo purposes only. For large files, consider chunking or using URLs.
             dataBase64: base64,
           };
           log('File selected:', { name: file.name, size: file.size, mimeType: file.type });
@@ -337,10 +376,10 @@
         // or the generic bridges.
         callFlutter('openStoreLocator', url);
       }
-      // Optionally expose for manual testing
-      window.openLocator = openLocator;
+      // for testing
+    //   window.openLocator = openLocator;
 
-      // Helpful info on load
+      // Events logger
       window.addEventListener('load', () => {
         log('Page loaded. Secure context: ' + (window.isSecureContext ? 'yes' : 'no'));
       });
