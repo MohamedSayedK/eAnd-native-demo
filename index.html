@@ -250,7 +250,10 @@
             return;
           }
           if (Notification.permission === 'granted') {
-            new Notification('Hello from Web', { body: 'This is a native notification.' });
+            new Notification('Mega Friday starts online', { 
+                body: 'This is a native notification.',
+                image: 'https://www.etisalat.ae/content/dam/etisalat/consumer/2025/rmp-banners/promos/en/mega-friday-rmp-en-p1-792x406.jpg',
+            icon: 'https://www.etisalat.ae/content/dam/etisalat/consumer/nwt/mega-menu/etisalat-logo/etisalat-logo.svg' });
             log('Notification shown.');
           } else if (Notification.permission !== 'denied') {
             const perm = await Notification.requestPermission();
