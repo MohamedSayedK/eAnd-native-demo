@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Native Web APIs Demo _ E&</title>
+    <style>
+      /* White, Red, Black palette */
+      :root {
+        color-scheme: light;
+        --bg: #ffffff;                /* white background */
+        --surface: #f7f7f7;           /* light surface */
+        --border: #e5e7eb;            /* light gray border */
+        --text: #111111;              /* black text */
+        --primary: #E10600;           /* strong red */
+        --primary-hover: #B30500;     /* darker red */
+        --link: #E10600;              /* red links */
+        --focus-ring: #ff7a66;        /* accessible red-ish focus */
+        --button-bg: var(--primary);  /* solid red buttons */
+        --button-bg-hover: var(--primary-hover);
+      }
+      body {
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, sans-serif;
+        margin: 0;
+        padding: 24px;
+        line-height: 1.5;
+        background: var(--bg);
+        color: var(--text);
+      }
+      .container {
+        max-width: 960px;
+        margin: 0 auto;
+      }
+      h1 {
+        margin-top: 0;
+        font-size: 1.6rem;
+        color: var(--text);
+      }
+      .buttons {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 12px;
+        margin: 16px 0 24px;
+      }
+      button {
+        padding: 12px 16px;
+        font-size: 1rem;
+        border-radius: 10px;
+        border: 1px solid var(--primary);
+        background: var(--button-bg);
+        color: var(--bg);
+        cursor: pointer;
+        transition: background .15s ease, border-color .15s ease, box-shadow .15s ease, transform .05s ease;
+      }
+      button:hover {
+        background: var(--button-bg-hover);
+        border-color: var(--primary-hover);
+        box-shadow: 0 0 0 2px color-mix(in oklab, var(--primary) 25%, transparent);
+      }
+      button:active {
+        transform: translateY(1px);
+      }
+      button:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 3px var(--focus-ring);
+        border-color: var(--primary);
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      video {
+        width: 100%;
+        max-height: 300px;
+        background: #000000;          /* black video backdrop */
+        border-radius: 12px;
+        border: 1px solid var(--border);
+      }
+      .section {
+        margin-bottom: 24px;
+      }
+      .output {
+        white-space: pre-wrap;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px;
+        min-height: 80px;
+        color: var(--text);
+      }
+      .note {
+        font-size: 0.9rem;
+        opacity: 0.9;
+      }
+      a {
+        color: var(--link);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Native Web APIs Demo (Camera, Location, Clipboard, Notifications, File Picker)</h1>
+
+      <div class="buttons">
+        <button id="btnCamera">Start Camera</button>
+        <button id="btnLocation">Get User Location</button>
+        <button id="btnClipboard">Copy Text to Clipboard</button>
+        <button id="btnNotify">Show Notification</button>
+        <button id="btnFilePicker">Pick File (Bridge to Flutter)</button>
+      </div>
+
+      <div class="section">
+        <h2>Camera Preview</h2>
+        <video id="cameraPreview" playsinline muted></video>
+        <p class="note">Note: Camera requires user permission. If you're on desktop without a camera, this may not work.</p>
+      </div>
+
+      <div class="section">
+        <h2>Output</h2>
+        <div id="output" class="output"></div>
+      </div>
+
+      <input id="fileInput" type="file" hidden />
+    </div>
+
+    <script>
+      const logEl = document.getElementById('output');
+      function log(msg, obj) {
+        const time = new Date().toLocaleTimeString();
+        const text = (typeof msg === 'string' ? msg : JSON.stringify(msg, null, 2));
+        logEl.textContent = `[${time}]\n` + text + (obj ? ('\n' + JSON.stringify(obj, null, 2)) : '') + '\n\n' + logEl.textContent;
+      }
+
+      // Camera
+      const btnCamera = document.getElementById('btnCamera');
+      const video = document.getElementById('cameraPreview');
+      let mediaStream = null;
+      async function toggleCamera() {
+        try {
+          if (!mediaStream) {
+            if (!navigator.mediaDevices?.getUserMedia) {
+              log('Camera API not supported in this browser.');
+              return;
+            }
+            mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            video.srcObject = mediaStream;
+            await video.play();
+            btnCamera.textContent = 'Stop Camera';
+            log('Camera started.');
+          } else {
+            mediaStream.getTracks().forEach(t => t.stop());
+            video.srcObject = null;
+            mediaStream = null;
+            btnCamera.textContent = 'Start Camera';
+            log('Camera stopped.');
+          }
+        } catch (err) {
+          log('Error accessing camera: ' + err?.message);
+        }
+      }
+
+      btnCamera.addEventListener('click', toggleCamera);
+
+      // Geolocation
+      const btnLocation = document.getElementById('btnLocation');
+      btnLocation.addEventListener('click', () => {
+        if (!('geolocation' in navigator)) {
+          log('Geolocation API not supported in this browser.');
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const { latitude, longitude, accuracy } = pos.coords;
+            const mapUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
+            log('Location acquired:', { latitude, longitude, accuracy, mapUrl });
+          },
+          (err) => {
+            log('Failed to get location: ' + err?.message);
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0,
+          }
+        );
+      });
+
+      // Clipboard (write text)
+      const btnClipboard = document.getElementById('btnClipboard');
+      btnClipboard.addEventListener('click', async () => {
+        try {
+          if (!navigator.clipboard?.writeText) {
+            log('Clipboard API not supported in this browser.');
+            return;
+          }
+          const text = 'Hello from the web page at ' + new Date().toISOString();
+          await navigator.clipboard.writeText(text);
+          log('Copied to clipboard: ' + text);
+        } catch (err) {
+          log('Clipboard write failed: ' + err?.message);
+        }
+      });
+
+      // Notifications
+      const btnNotify = document.getElementById('btnNotify');
+      btnNotify.addEventListener('click', async () => {
+        try {
+          if (!('Notification' in window)) {
+            log('Notifications not supported in this browser.');
+            return;
+          }
+          if (Notification.permission === 'granted') {
+            new Notification('Hello from Web', { body: 'This is a native notification.' });
+            log('Notification shown.');
+          } else if (Notification.permission !== 'denied') {
+            const perm = await Notification.requestPermission();
+            if (perm === 'granted') {
+              new Notification('Hello from Web', { body: 'Permission granted!' });
+              log('Notification shown.');
+            } else {
+              log('Notification permission denied by user.');
+            }
+          } else {
+            log('Notification permission previously denied.');
+          }
+        } catch (err) {
+          log('Notification failed: ' + err?.message);
+        }
+      });
+
+      // File Picker + Flutter Bridge
+      const fileInput = document.getElementById('fileInput');
+      const btnFilePicker = document.getElementById('btnFilePicker');
+      btnFilePicker.addEventListener('click', () => {
+        fileInput.value = '';
+        fileInput.click();
+      });
+
+      fileInput.addEventListener('change', async (ev) => {
+        const file = ev.target.files?.[0];
+        if (!file) {
+          log('No file selected.');
+          return;
+        }
+        try {
+          const base64 = await readFileAsBase64(file);
+          const payload = {
+            type: 'fileSelected',
+            name: file.name,
+            size: file.size,
+            mimeType: file.type || 'application/octet-stream',
+            lastModified: file.lastModified || null,
+            // For demo purposes only. For large files, consider chunking or using URLs.
+            dataBase64: base64,
+          };
+          log('File selected:', { name: file.name, size: file.size, mimeType: file.type });
+          sendMessageToFlutter(payload);
+        } catch (err) {
+          log('Failed to read file: ' + err?.message);
+        }
+      });
+
+      function readFileAsBase64(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result;
+            resolve(String(result));
+          };
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(file);
+        });
+      }
+
+      // Unified Flutter bridge helper: tries multiple patterns including company-specific ones
+      function callFlutter(methodName, payload) {
+        let delivered = false;
+        try {
+          // 0) Company-specific Android-style global object (e.g., window.deals.openStoreLocator)
+          if (window.deals && typeof window.deals[methodName] === 'function') {
+            window.deals[methodName](payload);
+            delivered = true;
+            log(`Sent to Flutter via window.deals.${methodName}(...)`);
+          }
+
+          // 1) iOS WKWebView messageHandlers (e.g., window.webkit.messageHandlers.openStoreLocator.postMessage(...))
+          else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers[methodName] && typeof window.webkit.messageHandlers[methodName].postMessage === 'function') {
+            window.webkit.messageHandlers[methodName].postMessage(payload);
+            delivered = true;
+            log(`Sent to Flutter via window.webkit.messageHandlers.${methodName}.postMessage(...)`);
+          }
+
+          // 2) webview_flutter JavascriptChannel named "FileBridge" (generic methodName passed inside JSON)
+          else if (window.FileBridge && typeof window.FileBridge.postMessage === 'function') {
+            window.FileBridge.postMessage(JSON.stringify({ method: methodName, payload }));
+            delivered = true;
+            log('Sent to Flutter via FileBridge.postMessage');
+          }
+
+          // 3) flutter_inappwebview: callHandler(methodName, payload)
+          else if (window.flutter_inappwebview && typeof window.flutter_inappwebview.callHandler === 'function') {
+            window.flutter_inappwebview.callHandler(methodName, payload);
+            delivered = true;
+            log(`Sent to Flutter via flutter_inappwebview.callHandler("${methodName}")`);
+          }
+
+          // 4) Fallback: postMessage to parent/opener (if embedded)
+          else {
+            const message = { source: 'web-demo', method: methodName, payload };
+            if (window.parent && window.parent !== window) {
+              window.parent.postMessage(message, '*');
+              delivered = true;
+              log('Sent to parent via window.parent.postMessage');
+            } else if (window.opener) {
+              window.opener.postMessage(message, '*');
+              delivered = true;
+              log('Sent to opener via window.opener.postMessage');
+            }
+          }
+        } catch (err) {
+          log('Bridge error: ' + err?.message);
+        }
+        if (!delivered) {
+          log('No known Flutter bridge detected. Ensure WebView integration matches one of the supported patterns.');
+        }
+      }
+
+      // Keep existing semantics: when a file is selected, notify Flutter via a method named "fileSelected"
+      function sendMessageToFlutter(payload) {
+        callFlutter('fileSelected', payload);
+      }
+
+      // Example: company-style API wrapper to open store locator
+      function openLocator(url) {
+        // This will try window.deals.openStoreLocator(url),
+        // or window.webkit.messageHandlers.openStoreLocator.postMessage(url),
+        // or the generic bridges.
+        callFlutter('openStoreLocator', url);
+      }
+      // Optionally expose for manual testing
+      window.openLocator = openLocator;
+
+      // Helpful info on load
+      window.addEventListener('load', () => {
+        log('Page loaded. Secure context: ' + (window.isSecureContext ? 'yes' : 'no'));
+      });
+    </script>
+  </body>
+</html>
