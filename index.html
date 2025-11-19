@@ -271,6 +271,8 @@
         }
       });
 
+      
+
       // File Picker + Flutter Bridge
       const fileInput = document.getElementById('fileInput');
       const btnFilePicker = document.getElementById('btnFilePicker');
@@ -372,6 +374,19 @@
         callFlutter('fileSelected', payload);
       }
 
+      // Explicit helpers to post to Flutter using your required method names
+      function sendBiometrics(data) {
+        callFlutter('flutterBridgeBiometrics', data);
+      }
+
+      function sendUAEPass(data) {
+        callFlutter('flutterBridgeUAEPASS', data);
+      }
+
+      // Expose helpers for easy manual triggering/testing from console or other scripts
+      window.sendBiometrics = sendBiometrics;
+      window.sendUAEPass = sendUAEPass;
+
       // Example: company-style API wrapper to open store locator
       function openLocator(url) {
         // This will try window.deals.openStoreLocator(url),
@@ -385,6 +400,55 @@
       // Events logger
       window.addEventListener('load', () => {
         log('Page loaded. Secure context: ' + (window.isSecureContext ? 'yes' : 'no'));
+      });
+
+      // Inbound message handlers from Flutter
+      function normalizeData(data) {
+        try {
+          if (typeof data === 'string') return JSON.parse(data);
+          return data;
+        } catch {
+          return { raw: String(data) };
+        }
+      }
+
+      function biometrics(data) {
+        const payload = normalizeData(data);
+        log('Received biometrics data from Flutter:', payload);
+      }
+
+      function uaePassData(data) {
+        const payload = normalizeData(data);
+        log('Received UAE PASS data from Flutter:', payload);
+      }
+
+      // Outbound: use these to post messages to Flutter
+      function sendBiometrics(data) {
+        const payload = normalizeData(data);
+        // Call native bridges using method name expected by Flutter side
+        callFlutter('flutterBridgeBiometrics', payload);
+      }
+
+      function sendUaePassData(data) {
+        const payload = normalizeData(data);
+        callFlutter('flutterBridgeUAEPASS', payload);
+      }
+
+      // Expose outbound functions on window (what the web side calls to reach Flutter)
+      if (typeof window.flutterBridgeBiometrics !== 'function') {
+        window.flutterBridgeBiometrics = function(data) { sendBiometrics(data); };
+      }
+      if (typeof window.flutterBridgeUAEPASS !== 'function') {
+        window.flutterBridgeUAEPASS = function(data) { sendUaePassData(data); };
+      }
+
+      // Keep inbound handlers available for Flutter-to-Web messages
+      window.biometrics = biometrics;     // Flutter can call window.biometrics(data)
+      window.uaePassData = uaePassData;   // Flutter can call window.uaePassData(data)
+
+      window.addEventListener('message', (event) => {
+        if (event.origin !== 'https://www.etisalat.com') return;
+        log('Received message from Flutter:', event.data);
       });
     </script>
   </body>
