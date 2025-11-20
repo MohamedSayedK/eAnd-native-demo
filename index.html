@@ -147,6 +147,8 @@
         <button id="btnClipboard">Copy Text to Clipboard</button>
         <button id="btnNotify">Show Notification</button>
         <button id="btnFilePicker">Pick File (Bridge to Flutter)</button>
+        <button id="btnSendBiometrics">Send Biometrics to App</button>
+        <button id="btnSendUAEPass">Send UAE PASS to App</button>
       </div>
 
       <div class="section">
@@ -164,6 +166,7 @@
     </div>
 
     <script>
+      // Logger
       const logEl = document.getElementById('output');
       function log(msg, obj) {
         const time = new Date().toLocaleTimeString();
@@ -304,6 +307,28 @@
         }
       });
 
+      // Outbound test buttons for Flutter bridge
+      const btnSendBiometrics = document.getElementById('btnSendBiometrics');
+      const btnSendUAEPass = document.getElementById('btnSendUAEPass');
+      btnSendBiometrics.addEventListener('click', () => {
+        const payload = { action: 'biometrics', timestamp: Date.now() };
+        try {
+          window.flutterBridgeBiometrics(payload);
+          log('Sent biometrics payload to Flutter.', payload);
+        } catch (err) {
+          log('Failed to send biometrics payload: ' + err?.message);
+        }
+      });
+      btnSendUAEPass.addEventListener('click', () => {
+        const payload = { action: 'uaePass', timestamp: Date.now() };
+        try {
+          window.flutterBridgeUAEPASS(payload);
+          log('Sent UAE PASS payload to Flutter.', payload);
+        } catch (err) {
+          log('Failed to send UAE PASS payload: ' + err?.message);
+        }
+      });
+
       function readFileAsBase64(file) {
         return new Promise((resolve, reject) => {
           const reader = new FileReader();
@@ -386,17 +411,7 @@
       // Expose helpers for easy manual triggering/testing from console or other scripts
       window.sendBiometrics = sendBiometrics;
       window.sendUAEPass = sendUAEPass;
-
-      // Example: company-style API wrapper to open store locator
-      function openLocator(url) {
-        // This will try window.deals.openStoreLocator(url),
-        // or window.webkit.messageHandlers.openStoreLocator.postMessage(url),
-        // or the generic bridges.
-        callFlutter('openStoreLocator', url);
-      }
-      // for testing
-    //   window.openLocator = openLocator;
-
+      
       // Events logger
       window.addEventListener('load', () => {
         log('Page loaded. Secure context: ' + (window.isSecureContext ? 'yes' : 'no'));
