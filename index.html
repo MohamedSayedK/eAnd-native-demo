@@ -307,6 +307,19 @@
         }
       });
 
+      
+      function readFileAsBase64(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result;
+            resolve(String(result));
+          };
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(file);
+        });
+      }
+
       // Outbound test buttons for Flutter bridge
       const btnSendBiometrics = document.getElementById('btnSendBiometrics');
       const btnSendUAEPass = document.getElementById('btnSendUAEPass');
@@ -328,18 +341,6 @@
           log('Failed to send UAE PASS payload: ' + err?.message);
         }
       });
-
-      function readFileAsBase64(file) {
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const result = reader.result;
-            resolve(String(result));
-          };
-          reader.onerror = () => reject(reader.error);
-          reader.readAsDataURL(file);
-        });
-      }
 
       // Unified Flutter bridge helper: tries multiple patterns including company-specific ones
       function callFlutter(methodName, payload) {
@@ -364,6 +365,13 @@
             window.FileBridge.postMessage(JSON.stringify({ method: methodName, payload }));
             delivered = true;
             log('Sent to Flutter via FileBridge.postMessage');
+          }
+
+          // 2b) Generic webview_flutter JavascriptChannel: window[methodName].postMessage(payload)
+          else if (window[methodName] && typeof window[methodName].postMessage === 'function') {
+            window[methodName].postMessage(JSON.stringify(payload));
+            delivered = true;
+            log(`Sent to Flutter via ${methodName}.postMessage(...)`);
           }
 
           // 3) flutter_inappwebview: callHandler(methodName, payload)
@@ -399,19 +407,9 @@
         callFlutter('fileSelected', payload);
       }
 
-      // Explicit helpers to post to Flutter using your required method names
-      function sendBiometrics(data) {
-        callFlutter('flutterBridgeBiometrics', data);
-      }
-
-      function sendUAEPass(data) {
-        callFlutter('flutterBridgeUAEPASS', data);
-      }
-
       // Expose helpers for easy manual triggering/testing from console or other scripts
-      window.sendBiometrics = sendBiometrics;
-      window.sendUAEPass = sendUAEPass;
-      
+      // (Defined later with normalization)
+
       // Events logger
       window.addEventListener('load', () => {
         log('Page loaded. Secure context: ' + (window.isSecureContext ? 'yes' : 'no'));
@@ -437,6 +435,10 @@
         log('Received UAE PASS data from Flutter:', payload);
       }
 
+      // Alias expected by Flutter dev: biometricsData(data)
+      // Keep both names so existing calls continue to work
+      function biometricsData(data) { return biometrics(data); }
+
       // Outbound: use these to post messages to Flutter
       function sendBiometrics(data) {
         const payload = normalizeData(data);
@@ -450,15 +452,16 @@
       }
 
       // Expose outbound functions on window (what the web side calls to reach Flutter)
-      if (typeof window.flutterBridgeBiometrics !== 'function') {
+      if (typeof window.flutterBridgeBiometrics === 'undefined') {
         window.flutterBridgeBiometrics = function(data) { sendBiometrics(data); };
       }
-      if (typeof window.flutterBridgeUAEPASS !== 'function') {
+      if (typeof window.flutterBridgeUAEPASS === 'undefined') {
         window.flutterBridgeUAEPASS = function(data) { sendUaePassData(data); };
       }
 
       // Keep inbound handlers available for Flutter-to-Web messages
       window.biometrics = biometrics;     // Flutter can call window.biometrics(data)
+      window.biometricsData = biometrics; // Flutter can call window.biometricsData(data)
       window.uaePassData = uaePassData;   // Flutter can call window.uaePassData(data)
 
       window.addEventListener('message', (event) => {
