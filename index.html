@@ -368,8 +368,8 @@
           }
 
           // 2b) Generic webview_flutter JavascriptChannel: window[methodName].postMessage(payload)
-          else if (window[methodName] && typeof window[methodName].postMessage === 'function') {
-            window[methodName].postMessage(JSON.stringify(payload));
+          else if (methodName && typeof methodName.postMessage === 'function') {
+            methodName.postMessage(JSON.stringify(payload));
             delivered = true;
             log(`Sent to Flutter via ${methodName}.postMessage(...)`);
           }
