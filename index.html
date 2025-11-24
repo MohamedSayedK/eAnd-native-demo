@@ -326,7 +326,7 @@
       btnSendBiometrics.addEventListener('click', () => {
         const payload = { action: 'biometrics', timestamp: Date.now() };
         try {
-          window.flutterBridgeBiometrics(payload);
+          flutterBridgeBiometrics(payload);
           log('Sent biometrics payload to Flutter.', payload);
         } catch (err) {
           log('Failed to send biometrics payload: ' + err?.message);
@@ -335,7 +335,7 @@
       btnSendUAEPass.addEventListener('click', () => {
         const payload = { action: 'uaePass', timestamp: Date.now() };
         try {
-          window.flutterBridgeUAEPASS(payload);
+          flutterBridgeUAEPASS(payload);
           log('Sent UAE PASS payload to Flutter.', payload);
         } catch (err) {
           log('Failed to send UAE PASS payload: ' + err?.message);
