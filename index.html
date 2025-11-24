@@ -326,7 +326,8 @@
       btnSendBiometrics.addEventListener('click', () => {
         const payload = { action: 'biometrics', timestamp: Date.now() };
         try {
-          flutterBridgeBiometrics(payload);
+          // Use unified bridge so it works across integration types
+          sendBiometrics(payload);
           log('Sent biometrics payload to Flutter.', payload);
         } catch (err) {
           log('Failed to send biometrics payload: ' + err?.message);
@@ -335,7 +336,8 @@
       btnSendUAEPass.addEventListener('click', () => {
         const payload = { action: 'uaePass', timestamp: Date.now() };
         try {
-          flutterBridgeUAEPASS(payload);
+          // Use unified bridge so it works across integration types
+          sendUaePassData(payload);
           log('Sent UAE PASS payload to Flutter.', payload);
         } catch (err) {
           log('Failed to send UAE PASS payload: ' + err?.message);
@@ -368,8 +370,8 @@
           }
 
           // 2b) Generic webview_flutter JavascriptChannel: window[methodName].postMessage(payload)
-          else if (methodName && typeof methodName.postMessage === 'function') {
-            methodName.postMessage(JSON.stringify(payload));
+          else if (window[methodName] && typeof window[methodName].postMessage === 'function') {
+            window[methodName].postMessage(JSON.stringify(payload));
             delivered = true;
             log(`Sent to Flutter via ${methodName}.postMessage(...)`);
           }
