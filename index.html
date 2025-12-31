@@ -87,6 +87,7 @@
         padding: 12px;
         min-height: 80px;
         color: var(--text);
+        overflow: scroll;
       }
       .note {
         font-size: 0.9rem;
@@ -649,9 +650,10 @@
           userIdentifier: String(phone).trim(),
           secret: otp,
           authenticator: 'ACCOUNT_NO',
-          userName: authResponseData.userName,
+          userName: `${String(phone).trim()}_ind`,
         };
         const headers = {
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
           transactionCode: authResponseData.transactionCode,
         };
