@@ -69,13 +69,13 @@
         opacity: 0.6;
         cursor: not-allowed;
       }
-      video {
-        width: 100%;
-        max-height: 300px;
-        background: #000000;          /* black video backdrop */
-        border-radius: 12px;
-        border: 1px solid var(--border);
-      }
+        video {
+          width: 100%;
+          max-height: 300px;
+          background: #000000;          /* black video backdrop */
+          border-radius: 12px;
+          border: 1px solid var(--border);
+        }
       .section {
         margin-bottom: 24px;
       }
@@ -137,6 +137,46 @@
           min-height: 60px;
         }
       }
+
+      .modal {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+      }
+      .modal.open { display: flex; }
+      .modal-backdrop {
+        position: absolute;
+        inset: 0;
+        background: color-mix(in oklab, #000 40%, transparent);
+      }
+      .modal-content {
+        position: relative;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: 0 10px 30px color-mix(in oklab, #000 20%, transparent);
+        width: min(90vw, 420px);
+        padding: 20px;
+      }
+      .modal-content h2 { margin: 0 0 12px; font-size: 1.3rem; }
+      .modal-content label { display: block; margin-bottom: 6px; }
+      .modal-content input[type="tel"] {
+        width: 90%;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        font-size: 1rem;
+        outline: none;
+      }
+      .modal-content input[type="tel"]:focus-visible {
+        box-shadow: 0 0 0 3px var(--focus-ring);
+        border-color: var(--primary);
+      }
+      .error { color: var(--primary); margin-top: 8px; min-height: 20px; }
+      .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
     </style>
   </head>
   <body>
@@ -149,6 +189,7 @@
         <button id="btnFilePicker">Pick File (Bridge to Flutter)</button>
         <button id="btnSendBiometrics">Send Biometrics to App</button>
         <button id="btnSendUAEPass">Send UAE PASS to App</button>
+        <button id="btnLoginOtp">Login with OTP</button>
       </div>
 
       <div class="section">
@@ -163,6 +204,22 @@
       </div>
 
       <input id="fileInput" type="file" hidden />
+    </div>
+
+    <div id="otpModal" class="modal" aria-hidden="true">
+      <div class="modal-backdrop" id="otpBackdrop"></div>
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="otpTitle">
+        <h2 id="otpTitle">Login with OTP</h2>
+        <form id="otpForm">
+          <label for="otpPhone">Phone Number</label>
+          <input id="otpPhone" type="tel" inputmode="tel" autocomplete="tel" />
+          <div id="otpError" class="error" aria-live="polite"></div>
+          <div class="modal-actions">
+            <button type="button" id="otpCancel">Cancel</button>
+            <button type="submit" id="otpSubmit">Request OTP</button>
+          </div>
+        </form>
+      </div>
     </div>
 
     <script>
@@ -469,6 +526,147 @@
       window.addEventListener('message', (event) => {
         if (event.origin !== 'https://www.etisalat.com') return;
         log('Received message from Flutter:', event.data);
+      });
+
+      const btnLoginOtp = document.getElementById('btnLoginOtp');
+      const otpModal = document.getElementById('otpModal');
+      const otpBackdrop = document.getElementById('otpBackdrop');
+      const otpForm = document.getElementById('otpForm');
+      const otpPhone = document.getElementById('otpPhone');
+      const otpCancel = document.getElementById('otpCancel');
+      const otpSubmit = document.getElementById('otpSubmit');
+      const otpError = document.getElementById('otpError');
+      const otpTitle = document.getElementById('otpTitle');
+      let otpStage = 'phone';
+      let otpCodeInputs = [];
+
+      function openOtpModal() {
+        otpModal.classList.add('open');
+        otpModal.setAttribute('aria-hidden', 'false');
+        setTimeout(() => otpPhone.focus(), 0);
+      }
+
+      function closeOtpModal() {
+        otpModal.classList.remove('open');
+        otpModal.setAttribute('aria-hidden', 'true');
+        otpForm.reset();
+        otpError.textContent = '';
+        otpSubmit.disabled = false;
+        otpStage = 'phone';
+        otpTitle.textContent = 'Login with OTP';
+        otpSubmit.textContent = 'Request OTP';
+        const codeContainer = document.getElementById('otpCodeContainer');
+        if (codeContainer) {
+          codeContainer.style.display = 'none';
+          otpCodeInputs.forEach(i => i.value = '');
+        }
+      }
+
+      btnLoginOtp.addEventListener('click', openOtpModal);
+      otpCancel.addEventListener('click', closeOtpModal);
+      otpBackdrop.addEventListener('click', closeOtpModal);
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && otpModal.classList.contains('open')) closeOtpModal();
+      });
+
+      function validatePhone(value) {
+        const v = String(value || '').trim();
+        return /^\+?[0-9]{7,15}$/.test(v);
+      }
+
+      function switchToOtpForm() {
+        otpStage = 'code';
+        otpTitle.textContent = 'Enter OTP';
+        otpPhone.style.display = 'none';
+        let codeContainer = document.getElementById('otpCodeContainer');
+        if (!codeContainer) {
+          codeContainer = document.createElement('div');
+          codeContainer.id = 'otpCodeContainer';
+          codeContainer.style.display = 'flex';
+          codeContainer.style.gap = '8px';
+          codeContainer.style.marginTop = '8px';
+          for (let i = 0; i < 6; i++) {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.inputMode = 'numeric';
+            input.maxLength = 1;
+            input.pattern = '[0-9]*';
+            input.style.width = '40px';
+            input.style.textAlign = 'center';
+            input.style.fontSize = '1.2rem';
+            input.addEventListener('input', (e) => {
+              e.target.value = String(e.target.value).replace(/[^0-9]/g, '');
+              if (e.target.value && i < 5) otpCodeInputs[i + 1].focus();
+            });
+            input.addEventListener('keydown', (e) => {
+              if (e.key === 'Backspace' && !input.value && i > 0) otpCodeInputs[i - 1].focus();
+            });
+            otpCodeInputs.push(input);
+            codeContainer.appendChild(input);
+          }
+          otpPhone.parentNode.insertBefore(codeContainer, otpError);
+        } else {
+          codeContainer.style.display = 'flex';
+        }
+        otpSubmit.textContent = 'Submit OTP';
+      }
+
+      async function requestOtp(phone) {
+        log('OTP request initiated.', { phone });
+        try {
+          const res = await fetch('https://preprodnew.etisalat.ae/b2c/eshop/api/v2/auth/authenticate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ accountNo: String(phone).trim(), authenticator: 'ACCOUNT_NO' }),
+          });
+          if (!res.ok) {
+            let body = '';
+            try { body = await res.text(); } catch {}
+            console.error('Authentication failed', res.status, body);
+            log('Authentication failed.', { status: res.status, body });
+            throw new Error('Authentication failed');
+          }
+          let data = null;
+          try { data = await res.json(); } catch {}
+          log('Authentication succeeded.', data || {});
+          switchToOtpForm();
+          return data;
+        } catch (err) {
+          console.error('OTP request error', err);
+          log('OTP request error: ' + (err?.message || String(err)));
+          throw err;
+        }
+      }
+
+      window.requestOtp = requestOtp;
+
+      otpForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (otpStage === 'phone') {
+          const phone = otpPhone.value;
+          if (!validatePhone(phone)) {
+            otpError.textContent = 'Enter a valid phone number';
+            return;
+          }
+          otpError.textContent = '';
+          otpSubmit.disabled = true;
+          try {
+            await requestOtp(phone);
+          } catch (err) {
+            otpError.textContent = err?.message || 'Failed to request OTP';
+          } finally {
+            otpSubmit.disabled = false;
+          }
+        } else {
+          const code = otpCodeInputs.map(i => String(i.value).trim()).join('');
+          if (!/^\d{6}$/.test(code)) {
+            otpError.textContent = 'Enter the 6-digit OTP';
+            return;
+          }
+          otpError.textContent = '';
+          log('OTP entered.', { code });
+          closeOtpModal();
+        }
       });
     </script>
   </body>
