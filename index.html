@@ -539,6 +539,7 @@
       const otpTitle = document.getElementById('otpTitle');
       let otpStage = 'phone';
       let otpCodeInputs = [];
+      let authResponseData = null;
 
       function openOtpModal() {
         otpModal.classList.add('open');
@@ -553,6 +554,7 @@
         otpError.textContent = '';
         otpSubmit.disabled = false;
         otpStage = 'phone';
+        authResponseData = null;
         otpTitle.textContent = 'Login with OTP';
         otpSubmit.textContent = 'Request OTP';
         const codeContainer = document.getElementById('otpCodeContainer');
@@ -629,11 +631,55 @@
           let data = null;
           try { data = await res.json(); } catch {}
           log('Authentication succeeded.', data || {});
+          authResponseData = data;
           switchToOtpForm();
           return data;
         } catch (err) {
           console.error('OTP request error', err);
           log('OTP request error: ' + (err?.message || String(err)));
+          throw err;
+        }
+      }
+
+      async function validateOtp(phone, otp) {
+        if (!authResponseData) {
+          throw new Error('Missing authentication data. Please request OTP again.');
+        }
+        const payload = {
+          userIdentifier: String(phone).trim(),
+          secret: otp,
+          authenticator: 'ACCOUNT_NO',
+          userName: authResponseData.userName,
+        };
+        const headers = {
+          'Content-Type': 'application/json',
+          transactionCode: authResponseData.transactionCode,
+        };
+        
+        log('OTP validation initiated.', { payload, headers });
+
+        try {
+          const res = await fetch('https://preprodnew.etisalat.ae/b2c/eshop/api/v2/auth/validate', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(payload),
+          });
+
+          if (!res.ok) {
+            let body = '';
+            try { body = await res.text(); } catch {}
+            console.error('Validation failed', res.status, body);
+            log('Validation failed.', { status: res.status, body });
+            throw new Error('Validation failed');
+          }
+
+          let data = null;
+          try { data = await res.json(); } catch {}
+          log('Validation succeeded.', data || {});
+          return data;
+        } catch (err) {
+          console.error('OTP validation error', err);
+          log('OTP validation error: ' + (err?.message || String(err)));
           throw err;
         }
       }
@@ -664,8 +710,15 @@
             return;
           }
           otpError.textContent = '';
-          log('OTP entered.', { code });
-          closeOtpModal();
+          otpSubmit.disabled = true;
+          try {
+            await validateOtp(otpPhone.value, code);
+            closeOtpModal();
+          } catch (err) {
+            otpError.textContent = err?.message || 'Validation failed';
+          } finally {
+            otpSubmit.disabled = false;
+          }
         }
       });
     </script>
